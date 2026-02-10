@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Lumis – Jira Connection</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 50px;
+        }
+        button {
+            padding: 12px 18px;
+            font-size: 16px;
+        }
+        .status {
+            margin-top: 20px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<h1>Lumis – Jira Integration</h1>
+
+<form action="/auth/jira/connect">
+    <button type="submit">🔗 Connect Jira</button>
+</form>
+
+<div class="status">
+    Status: {{ status }}
+</div>
+
+</body>
+</html>

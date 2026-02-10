@@ -1,25 +1,30 @@
 from fastapi import APIRouter, Request
-from commit_parser import analyze_commit
+from jira.client import get_issue
+from jira.actions import add_comment
+from logic.decision_engine import decide_jira_action
+from token_store import get_tokens
 
-github_router = APIRouter()
+router = APIRouter()
 
-@github_router.post("/webhook")
+@router.post("/webhook/github")
 async def github_webhook(request: Request):
     payload = await request.json()
 
     commits = payload.get("commits", [])
 
-    if not commits:
-        print("⚠️ No commits found in payload")
-        return {"status": "no commits"}
-
     for commit in commits:
-        result = analyze_commit(commit)
+        message = commit["message"]
 
-        print("\n📩 New Commit Received")
-        print(f"  Message : {result['message']}")
-        print(f"  Task ID : {result['task_id']}")
-        print(f"  Intent  : {result['intent']}")
-        print(f"  Areas   : {result['areas']}")
+        issue_key = extract_issue_key(message)
+        if not issue_key:
+            continue
+
+        access_token = get_jira_access_token()
+        issue = get_issue(issue_key, access_token)
+
+        decision = decide_jira_action(issue, message)
+
+        if decision and decision["action"] == "comment":
+            add_comment(issue_key, decision["message"], access_token)
 
     return {"status": "processed"}
