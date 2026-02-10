@@ -1,15 +1,25 @@
-def decide_jira_action(issue, commit_message: str):
-    status = issue["fields"]["status"]["name"]
+from commit_parser import detect_intent
 
-    # Rule 1: Never touch Done issues
-    if status.lower() == "done":
+def decide_jira_action(issue, commit_message: str):
+    """
+    Determines actions based on issue status and commit intent.
+    """
+    current_status = issue["fields"]["status"]["name"].lower()
+    intent = detect_intent(commit_message)
+
+    # Never update completed issues
+    if current_status == "done":
         return None
 
-    # Rule 2: Always comment commits
-    return {
+    # Base action: Always comment
+    decision = {
         "action": "comment",
-        "message": f"📌 Commit linked:\n{commit_message}"
+        "message": f"📌 Commit linked (Intent: {intent}):\n{commit_message}"
     }
 
-#to be continued with more complex rules in the future 
-# or AI integration for dynamic decision making
+    # If intent is 'feature' and it's not started, trigger transition
+    if intent == "feature" and current_status != "in progress":
+        decision["action"] = "transition"
+        decision["target_status"] = "In Progress"
+
+    return decision

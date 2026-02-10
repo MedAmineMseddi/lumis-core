@@ -6,7 +6,7 @@ from config import (
     JIRA_REDIRECT_URI,
     JIRA_AUTH_URL,
     JIRA_TOKEN_URL,
-    JIRA_API_BASE
+    JIRA_API_BASE_URL
 )
 from token_store import save_tokens
 
@@ -50,7 +50,7 @@ def get_accessible_resources(access_token: str):
         "Authorization": f"Bearer {access_token}"
     }
     response = requests.get(
-        f"{JIRA_API_BASE}/oauth/token/accessible-resources",
+        f"{JIRA_API_BASE_URL}/oauth/token/accessible-resources",
         headers=headers
     )
     response.raise_for_status()
