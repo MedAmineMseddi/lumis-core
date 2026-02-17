@@ -1,6 +1,7 @@
 import requests
 from urllib.parse import urlencode
 from config import (
+    JIRA_API_BASE,
     JIRA_CLIENT_ID,
     JIRA_CLIENT_SECRET,
     JIRA_REDIRECT_URI,
@@ -47,11 +48,14 @@ def exchange_code_for_token(code: str, user_id: str):
 
 def get_accessible_resources(access_token: str):
     headers = {
-        "Authorization": f"Bearer {access_token}"
+        "Authorization": f"Bearer {access_token}",
+        "Accept": "application/json"
     }
-    response = requests.get(
-        f"{JIRA_API_BASE_URL}/oauth/token/accessible-resources",
-        headers=headers
-    )
+    
+    # Correct Endpoint: https://api.atlassian.com/oauth/token/accessible-resources
+    # Use JIRA_API_BASE from config.py which is "https://api.atlassian.com"
+    url = f"{JIRA_API_BASE}/oauth/token/accessible-resources"
+    
+    response = requests.get(url, headers=headers)
     response.raise_for_status()
     return response.json()
