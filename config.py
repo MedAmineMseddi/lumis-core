@@ -10,6 +10,10 @@ JIRA_REDIRECT_URI = os.getenv("JIRA_REDIRECT_URI", "http://localhost:8000/auth/j
 JIRA_AUTH_URL = "https://auth.atlassian.com/authorize"
 JIRA_TOKEN_URL = "https://auth.atlassian.com/oauth/token"
 
+# Supabase Credentials
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
+
 # Base for accessible resources
 JIRA_API_BASE = "https://api.atlassian.com"
 # Base for instance actions

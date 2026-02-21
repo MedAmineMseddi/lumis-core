@@ -1,74 +1,67 @@
 import time
 import requests
-import json
-import os
-from config import JIRA_CLIENT_ID, JIRA_CLIENT_SECRET, JIRA_TOKEN_URL
+from supabase import create_client, Client
+from config import JIRA_CLIENT_ID, JIRA_CLIENT_SECRET, JIRA_TOKEN_URL, SUPABASE_URL, SUPABASE_KEY
 
-# File-based store to persist across restarts
-TOKEN_FILE = "jira_tokens.json"
-
-def load_all_tokens() -> dict:
-    """Loads all tokens from the local JSON file."""
-    if not os.path.exists(TOKEN_FILE):
-        return {}
-    try:
-        with open(TOKEN_FILE, "r") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, IOError):
-        return {}
+# Initialize Supabase client
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def save_tokens(user_id: str, tokens: dict):
-    """Saves tokens for a specific user to the local JSON file."""
-    all_tokens = load_all_tokens()
+    """Saves or updates tokens in the Supabase 'jira_tokens' table."""
+    # Calculate expiration time
+    expires_at = time.time() + tokens.get("expires_in", 3600)
     
-    # Calculate expiration time (current time + expires_in seconds)
-    tokens["expires_at"] = time.time() + tokens.get("expires_in", 3600)
-    all_tokens[user_id] = tokens
+    data = {
+        "user_id": user_id,
+        "access_token": tokens.get("access_token"),
+        "refresh_token": tokens.get("refresh_token"),
+        "expires_at": expires_at
+    }
     
-    with open(TOKEN_FILE, "w") as f:
-        json.dump(all_tokens, f, indent=4)
+    # Upsert data: Update if user_id exists, otherwise insert
+    supabase.table("jira_tokens").upsert(data).execute()
 
 def refresh_jira_token(user_id: str):
-    """Uses the refresh token to get a new access token and updates the file."""
-    all_tokens = load_all_tokens()
-    tokens = all_tokens.get(user_id)
-    
-    if not tokens or "refresh_token" not in tokens:
+    """Refreshes the Jira token and updates the Supabase record."""
+    response = supabase.table("jira_tokens").select("*").eq("user_id", user_id).execute()
+    user_data = response.data[0] if response.data else None
+
+    if not user_data or not user_data.get("refresh_token"):
         return None
 
     payload = {
         "grant_type": "refresh_token",
         "client_id": JIRA_CLIENT_ID,
         "client_secret": JIRA_CLIENT_SECRET,
-        "refresh_token": tokens["refresh_token"]
+        "refresh_token": user_data["refresh_token"]
     }
 
-    response = requests.post(JIRA_TOKEN_URL, json=payload)
-    if response.status_code == 200:
-        new_tokens = response.json()
-        # Maintain the existing refresh token if a new one isn't provided
+    res = requests.post(JIRA_TOKEN_URL, json=payload)
+    if res.status_code == 200:
+        new_tokens = res.json()
+        # Maintain the old refresh token if the API doesn't return a new one
         if "refresh_token" not in new_tokens:
-            new_tokens["refresh_token"] = tokens["refresh_token"]
+            new_tokens["refresh_token"] = user_data["refresh_token"]
         
         save_tokens(user_id, new_tokens)
         return new_tokens["access_token"]
     return None
 
 def get_valid_token(user_id: str):
-    """Retrieves a valid token from the file, refreshing it if nearly expired."""
-    all_tokens = load_all_tokens()
-    tokens = all_tokens.get(user_id)
-    
-    if not tokens:
+    """Retrieves a valid token from Supabase, refreshing it if necessary."""
+    response = supabase.table("jira_tokens").select("*").eq("user_id", user_id).execute()
+    user_data = response.data[0] if response.data else None
+
+    if not user_data:
         return None
 
-    # Refresh if token is within 60 seconds of expiring
-    if time.time() > (tokens["expires_at"] - 60):
+    # Refresh if within 60 seconds of expiring
+    if time.time() > (user_data["expires_at"] - 60):
         return refresh_jira_token(user_id)
     
-    return tokens["access_token"]
+    return user_data["access_token"]
 
 def is_connected(user_id: str) -> bool:
-    """Checks if a user has a stored token in the file."""
-    all_tokens = load_all_tokens()
-    return user_id in all_tokens
+    """Checks if a user has a record in Supabase."""
+    response = supabase.table("jira_tokens").select("user_id").eq("user_id", user_id).execute()
+    return len(response.data) > 0
